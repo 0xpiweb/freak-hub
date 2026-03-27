@@ -322,14 +322,13 @@ export default async function Dashboard() {
           <StatCard icon="🏛️" label="Staked"       value={staked}      pctVal={pct(staked)}      provenance="🏰" />
           <StatCard icon="🔐" label="Locked"       value={locked}      pctVal={pct(locked)}      provenance="🏰" />
           <StatCard icon="🔥" label="Burned"       value={burned}      pctVal={pct(burned)}      provenance="🏰" />
-          <StatCard icon="🔥" label="Total Burned" value={dead}        pctVal={pct(dead)}        sub="💀 Dead wallet"  provenance="💀" />
+          <StatCard icon="🔥" label="Total Burned" value={dead}        pctVal={pct(dead)}        provenance="💀" />
           <StatCard icon="⚖️" label="LP Pair"      value={lp}          pctVal={pct(lp)} />
           <StatCard
             iconSrc="/logo-freak.png"
             label="Circulating"
             value={circulating}
             pctVal={pct(circulating)}
-            sub="Derived from supply"
           />
         </div>
 
