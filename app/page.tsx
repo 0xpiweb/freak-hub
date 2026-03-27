@@ -1,6 +1,36 @@
 import { createPublicClient, http, formatUnits } from 'viem';
 import { avalanche } from 'viem/chains';
 
+// ── ERC-20 balanceOf ───────────────────────────────────────────────────────────
+const ERC20_ABI = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
+
+async function fetchDeadBalance(tokenAddress: string): Promise<number> {
+  try {
+    const client = createPublicClient({
+      chain: avalanche,
+      transport: http(process.env.AVAX_RPC_URL ?? 'https://api.avax.network/ext/bc/C/rpc'),
+    });
+    const balance = await client.readContract({
+      address: tokenAddress as `0x${string}`,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: ['0x000000000000000000000000000000000000dEaD'],
+    });
+    return Math.round(Number(formatUnits(balance, 18)));
+  } catch (err) {
+    console.error('fetchDeadBalance error:', err);
+    return 0;
+  }
+}
+
 // ── Moat contract ──────────────────────────────────────────────────────────────
 const MOAT_ABI = [
   {
@@ -136,9 +166,10 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, provenance }: Stat
 export const revalidate = 60;
 
 export default async function Dashboard() {
-  const [dexRes, moat] = await Promise.all([
+  const [dexRes, moat, dead] = await Promise.all([
     fetch(DEX_API, { next: { revalidate: 60 } }),
     fetchMoatData(MOAT_ADDR),
+    fetchDeadBalance(TOKEN_ADDR),
   ]);
 
   const dexJson = await dexRes.json().catch(() => null);
@@ -161,7 +192,7 @@ export default async function Dashboard() {
   const staked      = moat.staked;
   const locked      = moat.locked;
   const burned      = moat.burned;
-  const dead        = 0; // dead-wallet total (separate chain query — add later)
+  // dead is live from fetchDeadBalance (balanceOf dead wallet on TOKEN contract)
   const circulating = TOTAL_SUPPLY - staked - locked - dead - lp;
 
   // 3-segment supply bar
