@@ -195,15 +195,20 @@ export default async function Dashboard() {
   // dead is live from fetchDeadBalance (balanceOf dead wallet on TOKEN contract)
   const circulating = TOTAL_SUPPLY - staked - locked - dead - lp;
 
-  // 3-segment supply bar
-  const securedMoat    = staked + locked;
-  const barCirculating = TOTAL_SUPPLY - securedMoat - dead;
+  // 5-segment supply bar — mirrors the 5 stat cards exactly
+  const securedMoat = staked + locked;
   const barSegments = [
     {
-      label: 'Secured in Moat',
-      value: securedMoat,
+      label: 'Staked',
+      value: staked,
       gradient: 'linear-gradient(180deg,#3B82F6 0%,#1D4ED8 100%)',
       dot: '#3B82F6',
+    },
+    {
+      label: 'Locked',
+      value: locked,
+      gradient: 'linear-gradient(180deg,#7C3AED 0%,#5B21B6 100%)',
+      dot: '#7C3AED',
     },
     {
       label: 'Burned',
@@ -212,8 +217,14 @@ export default async function Dashboard() {
       dot: '#FF00FF',
     },
     {
+      label: 'LP Pair',
+      value: lp,
+      gradient: 'linear-gradient(180deg,#F59E0B 0%,#D97706 100%)',
+      dot: '#F59E0B',
+    },
+    {
       label: 'Circulating',
-      value: barCirculating,
+      value: circulating,
       gradient: 'linear-gradient(180deg,#FF8C00 0%,#CC7000 100%)',
       dot: '#FF8C00',
     },
