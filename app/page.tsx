@@ -6,7 +6,7 @@ const DEX_PAIR     = process.env.NEXT_PUBLIC_DEX_PAIR              ?? '0x0e13283
 
 const MOAT_URL = `https://moats.app/moat/${MOAT_ADDR}`;
 const BURN_URL = `https://snowtrace.io/token/${TOKEN_ADDR}?a=0x000000000000000000000000000000000000dead`;
-const BUY_URL  = `https://dexscreener.com/avalanche/${DEX_PAIR}`;
+const BUY_URL  = process.env.NEXT_PUBLIC_BUY_URL ?? `https://dexscreener.com/avalanche/${DEX_PAIR}`;
 const DEX_URL  = `https://dexscreener.com/avalanche/${DEX_PAIR}`;
 const DEX_API  = `https://api.dexscreener.com/latest/dex/pairs/avalanche/${DEX_PAIR}`;
 
