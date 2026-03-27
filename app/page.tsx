@@ -319,11 +319,11 @@ export default async function Dashboard() {
 
         {/* ── Token Tracking Cards ────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          <StatCard icon="🏛️" label="Staked"       value={staked}      pctVal={pct(staked)}      sub="🏰 Fortifi Moat" provenance="🏰" />
-          <StatCard icon="🔐" label="Locked"       value={locked}      pctVal={pct(locked)}      sub="🏰 Fortifi Moat" provenance="🏰" />
-          <StatCard icon="🔥" label="Burned"       value={burned}      pctVal={pct(burned)}      sub="🏰 Fortifi Moat" provenance="🏰" />
+          <StatCard icon="🏛️" label="Staked"       value={staked}      pctVal={pct(staked)}      provenance="🏰" />
+          <StatCard icon="🔐" label="Locked"       value={locked}      pctVal={pct(locked)}      provenance="🏰" />
+          <StatCard icon="🔥" label="Burned"       value={burned}      pctVal={pct(burned)}      provenance="🏰" />
           <StatCard icon="🔥" label="Total Burned" value={dead}        pctVal={pct(dead)}        sub="💀 Dead wallet"  provenance="💀" />
-          <StatCard icon="⚖️" label="LP Pair"      value={lp}          pctVal={pct(lp)}          sub="📊 Dexscreener" />
+          <StatCard icon="⚖️" label="LP Pair"      value={lp}          pctVal={pct(lp)} />
           <StatCard
             iconSrc="/logo-freak.png"
             label="Circulating"
