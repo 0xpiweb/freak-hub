@@ -1,5 +1,6 @@
 import { fetchMoatData, fetchDeadBalance } from '@/lib/chain';
 import { kvGet } from '@/lib/kv';
+import DeltaRow from '@/app/components/DeltaRow';
 
 // ── Snapshot type ──────────────────────────────────────────────────────────────
 interface Snapshot {
@@ -43,16 +44,6 @@ function fmtPrice(n: number): string {
 
 function pct(value: number): string {
   return (value / TOTAL_SUPPLY * 100).toFixed(2);
-}
-
-// ── DeltaChip ──────────────────────────────────────────────────────────────────
-function DeltaChip({ delta }: { delta: number }) {
-  const up = delta >= 0;
-  return (
-    <span className={`font-medium ${up ? 'text-green-400' : 'text-red-400'}`}>
-      {up ? '▲' : '▼'} {up ? '+' : '-'}{fmt(Math.abs(delta))}
-    </span>
-  );
 }
 
 // ── Inline StatCard ────────────────────────────────────────────────────────────
@@ -102,13 +93,11 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, delta, provenance 
       </p>
 
       <div className="h-4 flex items-center">
-        {delta != null ? (
-          <span className="text-zinc-500 text-xs flex items-center gap-1">
-            24h: <DeltaChip delta={delta} />
-          </span>
-        ) : sub ? (
-          <span className="text-zinc-600 text-xs">{sub}</span>
-        ) : null}
+        <DeltaRow
+          field={label.toLowerCase().replace(/\s+/g, '_')}
+          current={value}
+          serverDelta={delta ?? null}
+        />
       </div>
 
       {provenance && (
