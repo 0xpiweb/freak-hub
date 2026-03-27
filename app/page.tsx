@@ -1,3 +1,46 @@
+import { createPublicClient, http, formatUnits } from 'viem';
+import { avalanche } from 'viem/chains';
+
+// ── Moat contract ──────────────────────────────────────────────────────────────
+const MOAT_ABI = [
+  {
+    name: 'getTotalAmounts',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [
+      { name: '_totalStaked',     type: 'uint256' },
+      { name: '_totalLocked',     type: 'uint256' },
+      { name: '_totalBurned',     type: 'uint256' },
+      { name: '_totalInContract', type: 'uint256' },
+    ],
+  },
+] as const;
+
+async function fetchMoatData(moatAddress: string) {
+  try {
+    const client = createPublicClient({
+      chain: avalanche,
+      transport: http(process.env.AVAX_RPC_URL ?? 'https://api.avax.network/ext/bc/C/rpc'),
+    });
+
+    const [totalStaked, totalLocked, totalBurned] = await client.readContract({
+      address: moatAddress as `0x${string}`,
+      abi: MOAT_ABI,
+      functionName: 'getTotalAmounts',
+    });
+
+    return {
+      staked: Math.round(Number(formatUnits(totalStaked, 18))),
+      locked: Math.round(Number(formatUnits(totalLocked, 18))),
+      burned: Math.round(Number(formatUnits(totalBurned, 18))),
+    };
+  } catch (err) {
+    console.error('fetchMoatData error:', err);
+    return { staked: 0, locked: 0, burned: 0 };
+  }
+}
+
 // ── Env-driven constants ───────────────────────────────────────────────────────
 const TOTAL_SUPPLY = Number(process.env.NEXT_PUBLIC_TOTAL_SUPPLY   ?? '1000000000');
 const TOKEN_ADDR   = process.env.NEXT_PUBLIC_TOKEN_ADDRESS         ?? '0x201d04f88Bc9B3bdAcdf0519a95E117f25062D38';
@@ -93,8 +136,11 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, provenance }: Stat
 export const revalidate = 60;
 
 export default async function Dashboard() {
-  // Fetch Dexscreener — the only external dependency
-  const dexRes  = await fetch(DEX_API, { next: { revalidate: 60 } });
+  const [dexRes, moat] = await Promise.all([
+    fetch(DEX_API, { next: { revalidate: 60 } }),
+    fetchMoatData(MOAT_ADDR),
+  ]);
+
   const dexJson = await dexRes.json().catch(() => null);
   const pair    = dexJson?.pairs?.[0] ?? null;
 
@@ -111,12 +157,11 @@ export default async function Dashboard() {
   const lpRaw = pair?.liquidity?.base ? parseFloat(pair.liquidity.base) : 0;
   const lp    = Math.round(lpRaw);
 
-  // Supply breakdown
-  // staked / locked / burned require moat-event indexing — add later
-  const staked      = 0;
-  const locked      = 0;
-  const burned      = 0; // moat burns
-  const dead        = 0; // dead-wallet total (chain query)
+  // Supply breakdown — live from Moat contract
+  const staked      = moat.staked;
+  const locked      = moat.locked;
+  const burned      = moat.burned;
+  const dead        = 0; // dead-wallet total (separate chain query — add later)
   const circulating = TOTAL_SUPPLY - staked - locked - dead - lp;
 
   // 3-segment supply bar
