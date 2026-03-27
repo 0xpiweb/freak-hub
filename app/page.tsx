@@ -463,6 +463,19 @@ export default async function Dashboard() {
           Last live check: {updatedAt}
         </p>
       </div>
+
+      {/* ── Ecosystem floating button ────────────────────────────────────────── */}
+      <a
+        href="https://lil-hub.vercel.app"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white text-sm font-medium shadow-lg transition-all duration-200 hover:scale-105 hover:border-white/40 hover:bg-white/15"
+      >
+        <div className="h-5 w-5 rounded-full overflow-hidden flex-shrink-0">
+          <img src="/lil-token.png" className="h-full w-full object-cover" alt="LIL" />
+        </div>
+        $LIL Hub
+      </a>
     </main>
   );
 }
