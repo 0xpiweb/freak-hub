@@ -1,74 +1,15 @@
-import { createPublicClient, http, formatUnits } from 'viem';
-import { avalanche } from 'viem/chains';
+import { fetchMoatData, fetchDeadBalance } from '@/lib/chain';
+import { kvGet } from '@/lib/kv';
 
-// ── ERC-20 balanceOf ───────────────────────────────────────────────────────────
-const ERC20_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-] as const;
-
-async function fetchDeadBalance(tokenAddress: string): Promise<number> {
-  try {
-    const client = createPublicClient({
-      chain: avalanche,
-      transport: http(process.env.AVAX_RPC_URL ?? 'https://api.avax.network/ext/bc/C/rpc'),
-    });
-    const balance = await client.readContract({
-      address: tokenAddress as `0x${string}`,
-      abi: ERC20_ABI,
-      functionName: 'balanceOf',
-      args: ['0x000000000000000000000000000000000000dEaD'],
-    });
-    return Math.round(Number(formatUnits(balance, 18)));
-  } catch (err) {
-    console.error('fetchDeadBalance error:', err);
-    return 0;
-  }
-}
-
-// ── Moat contract ──────────────────────────────────────────────────────────────
-const MOAT_ABI = [
-  {
-    name: 'getTotalAmounts',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [
-      { name: '_totalStaked',     type: 'uint256' },
-      { name: '_totalLocked',     type: 'uint256' },
-      { name: '_totalBurned',     type: 'uint256' },
-      { name: '_totalInContract', type: 'uint256' },
-    ],
-  },
-] as const;
-
-async function fetchMoatData(moatAddress: string) {
-  try {
-    const client = createPublicClient({
-      chain: avalanche,
-      transport: http(process.env.AVAX_RPC_URL ?? 'https://api.avax.network/ext/bc/C/rpc'),
-    });
-
-    const [totalStaked, totalLocked, totalBurned] = await client.readContract({
-      address: moatAddress as `0x${string}`,
-      abi: MOAT_ABI,
-      functionName: 'getTotalAmounts',
-    });
-
-    return {
-      staked: Math.round(Number(formatUnits(totalStaked, 18))),
-      locked: Math.round(Number(formatUnits(totalLocked, 18))),
-      burned: Math.round(Number(formatUnits(totalBurned, 18))),
-    };
-  } catch (err) {
-    console.error('fetchMoatData error:', err);
-    return { staked: 0, locked: 0, burned: 0 };
-  }
+// ── Snapshot type ──────────────────────────────────────────────────────────────
+interface Snapshot {
+  staked: number;
+  locked: number;
+  burned: number;
+  dead: number;
+  lp: number;
+  circulating: number;
+  ts: number;
 }
 
 // ── Env-driven constants ───────────────────────────────────────────────────────
@@ -104,6 +45,16 @@ function pct(value: number): string {
   return (value / TOTAL_SUPPLY * 100).toFixed(2);
 }
 
+// ── DeltaChip ──────────────────────────────────────────────────────────────────
+function DeltaChip({ delta }: { delta: number }) {
+  const up = delta >= 0;
+  return (
+    <span className={`font-medium ${up ? 'text-green-400' : 'text-red-400'}`}>
+      {up ? '▲' : '▼'} {up ? '+' : '-'}{fmt(Math.abs(delta))}
+    </span>
+  );
+}
+
 // ── Inline StatCard ────────────────────────────────────────────────────────────
 interface StatCardProps {
   icon?: string;
@@ -112,10 +63,11 @@ interface StatCardProps {
   value: number;
   pctVal: string;
   sub?: string;
+  delta?: number | null;
   provenance?: string;
 }
 
-function StatCard({ icon, iconSrc, label, value, pctVal, sub, provenance }: StatCardProps) {
+function StatCard({ icon, iconSrc, label, value, pctVal, sub, delta, provenance }: StatCardProps) {
   return (
     <div className="relative bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col gap-2 transition-all duration-300 ease-in-out hover:border-[#FF8C00] hover:shadow-[0_0_15px_rgba(255,140,0,0.35)]">
       <div className="flex items-center justify-between">
@@ -149,8 +101,16 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, provenance }: Stat
         <span className="text-zinc-500 text-base font-normal ml-1">$FREAK</span>
       </p>
 
-      <div className="h-4">
-        {sub && <span className="text-zinc-600 text-xs">{sub}</span>}
+      <div className="h-4 flex items-center">
+        {delta != null ? (
+          <span className="text-zinc-500 text-xs flex items-center gap-1">
+            24h: <DeltaChip delta={delta} />
+          </span>
+        ) : sub ? (
+          <span className="text-zinc-600 text-xs">{sub}</span>
+        ) : (
+          <span className="text-zinc-700 text-xs">Awaiting snapshot</span>
+        )}
       </div>
 
       {provenance && (
@@ -166,10 +126,11 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, provenance }: Stat
 export const revalidate = 60;
 
 export default async function Dashboard() {
-  const [dexRes, moat, dead] = await Promise.all([
+  const [dexRes, moat, dead, snapshot] = await Promise.all([
     fetch(DEX_API, { next: { revalidate: 60 } }),
     fetchMoatData(MOAT_ADDR),
     fetchDeadBalance(TOKEN_ADDR),
+    kvGet<Snapshot>('freak:snapshot'),
   ]);
 
   const dexJson = await dexRes.json().catch(() => null);
@@ -188,12 +149,22 @@ export default async function Dashboard() {
   const lpRaw = pair?.liquidity?.base ? parseFloat(pair.liquidity.base) : 0;
   const lp    = Math.round(lpRaw);
 
-  // Supply breakdown — live from Moat contract
+  // Supply breakdown — live from Moat contract + dead wallet
   const staked      = moat.staked;
   const locked      = moat.locked;
   const burned      = moat.burned;
   // dead is live from fetchDeadBalance (balanceOf dead wallet on TOKEN contract)
   const circulating = TOTAL_SUPPLY - staked - locked - dead - lp;
+
+  // 24h deltas — current live value minus last daily snapshot
+  const deltas = {
+    staked:      snapshot ? staked      - snapshot.staked      : null,
+    locked:      snapshot ? locked      - snapshot.locked      : null,
+    burned:      snapshot ? burned      - snapshot.burned      : null,
+    dead:        snapshot ? dead        - snapshot.dead        : null,
+    lp:          snapshot ? lp          - snapshot.lp          : null,
+    circulating: snapshot ? circulating - snapshot.circulating : null,
+  };
 
   // 5-segment supply bar — mirrors the 5 stat cards exactly
   const securedMoat = staked + locked;
@@ -319,20 +290,21 @@ export default async function Dashboard() {
 
         {/* ── Token Tracking Cards ────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-          <StatCard icon="🏛️" label="Staked"       value={staked}      pctVal={pct(staked)}      provenance="🏰" />
-          <StatCard icon="🔐" label="Locked"       value={locked}      pctVal={pct(locked)}      provenance="🏰" />
-          <StatCard icon="🔥" label="Burned"       value={burned}      pctVal={pct(burned)}      provenance="🏰" />
-          <StatCard icon="🔥" label="Total Burned" value={dead}        pctVal={pct(dead)}        provenance="💀" />
-          <StatCard icon="⚖️" label="LP Pair"      value={lp}          pctVal={pct(lp)} />
+          <StatCard icon="🏛️" label="Staked"       value={staked}      pctVal={pct(staked)}      delta={deltas.staked}      provenance="🏰" />
+          <StatCard icon="🔐" label="Locked"       value={locked}      pctVal={pct(locked)}      delta={deltas.locked}      provenance="🏰" />
+          <StatCard icon="🔥" label="Burned"       value={burned}      pctVal={pct(burned)}      delta={deltas.burned}      provenance="🏰" />
+          <StatCard icon="🔥" label="Total Burned" value={dead}        pctVal={pct(dead)}        delta={deltas.dead}        provenance="💀" />
+          <StatCard icon="⚖️" label="LP Pair"      value={lp}          pctVal={pct(lp)}          delta={deltas.lp} />
           <StatCard
             iconSrc="/logo-freak.png"
             label="Circulating"
             value={circulating}
             pctVal={pct(circulating)}
+            delta={deltas.circulating}
           />
         </div>
 
-        {/* ── Secured in Moat + 3-Segment Supply Bar ──────────────────────────── */}
+        {/* ── Secured in Moat + 5-Segment Supply Bar ──────────────────────────── */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mb-4 transition-all duration-300 ease-in-out hover:border-[#FF8C00] hover:shadow-[0_0_15px_rgba(255,140,0,0.35)]">
           <div className="flex flex-wrap items-center gap-2 mb-8">
             <span className="text-lg font-bold tracking-tight leading-none" style={{ color: '#FF8C00' }}>
