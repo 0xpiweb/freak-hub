@@ -78,9 +78,9 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, delta, provenance 
         <span
           className="text-xs font-semibold px-2 py-0.5 rounded-full"
           style={{
-            background: 'rgba(255,140,0,0.08)',
-            border: '1px solid rgba(255,140,0,0.35)',
-            color: '#FF8C00',
+            background: 'rgba(57,255,20,0.08)',
+            border: '1px solid rgba(57,255,20,0.35)',
+            color: '#39FF14',
           }}
         >
           {pctVal}%
