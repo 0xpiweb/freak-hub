@@ -108,9 +108,7 @@ function StatCard({ icon, iconSrc, label, value, pctVal, sub, delta, provenance 
           </span>
         ) : sub ? (
           <span className="text-zinc-600 text-xs">{sub}</span>
-        ) : (
-          <span className="text-zinc-700 text-xs">Awaiting snapshot</span>
-        )}
+        ) : null}
       </div>
 
       {provenance && (
@@ -157,6 +155,12 @@ export default async function Dashboard() {
   const circulating = TOTAL_SUPPLY - staked - locked - dead - lp;
 
   // 24h deltas — current live value minus last daily snapshot
+  if (!snapshot) {
+    console.warn('[page] No snapshot in KV — delta rows will be empty');
+  } else {
+    console.log('[page] Snapshot loaded ts:', new Date(snapshot.ts).toISOString(),
+      'staked:', snapshot.staked, 'dead:', snapshot.dead);
+  }
   const deltas = {
     staked:      snapshot ? staked      - snapshot.staked      : null,
     locked:      snapshot ? locked      - snapshot.locked      : null,
